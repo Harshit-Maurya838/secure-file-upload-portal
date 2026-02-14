@@ -120,10 +120,17 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Media Files (User Uploads)
+# SECURITY WARNING: In production, we do NOT serve media files with Django.
+# We use a separate domain or CDN (e.g., AWS S3, Google Cloud Storage, Azure Blob).
+# Serving user uploads from the same domain as the application exposes us to XSS attacks.
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
