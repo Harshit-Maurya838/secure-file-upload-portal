@@ -4,6 +4,9 @@ from .forms import UploadFileForm
 from .models import UploadedFile
 
 
+from django_ratelimit.decorators import ratelimit
+
+@ratelimit(key='ip', rate='10/m', method='POST', block=True)
 @login_required
 def upload_file(request):
     if request.method == 'POST':

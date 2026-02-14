@@ -4,6 +4,7 @@ cryptography==44.0.2
 Django==4.2
 django-appconf==1.1.0
 django-cryptography==1.1
+django-ratelimit==4.1.0
 pycparser==2.22
 python-dotenv==1.0.1
 python-magic==0.4.27
