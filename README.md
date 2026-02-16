@@ -1,121 +1,133 @@
 # 🔐 Secure File Upload Portal
 
-This is a lightweight Django web app that shows how to **handle file uploads securely** — with encryption, validation, and a simple UI.
+This project is a **Secure File Intake Gateway** built with Django. Unlike standard upload applications, it is engineered with a strict **Defense-in-Depth** architecture to safely accept, analyze, and neutralize untrusted files before they are made available to users.
 
 ---
 
-## 🧠 What's the idea?
+## 🏗 Architecture Overview
 
-Imagine a file upload feature that:
-- Lets users upload documents or images
-- Stores a short description along with each file
-- Encrypts sensitive data on the backend
-- Actually validates the upload
+The system employs a multi-stage pipeline where every file is treated as hostile until proven otherwise.
 
-That's what this little project does. It’s meant to demonstrate **good practices**, not just make things work.
+```mermaid
+graph LR
+    User([User]) -->|Upload| Quarantine[🔒 Quarantine Storage]
+    Quarantine -->|Stream Scan| ClamAV[🦠 ClamAV Scanner]
+    ClamAV -- Infected --> Reject[❌ Reject & Log]
+    ClamAV -- Clean --> CDR[🛠 Content Disarm & Reconstruction]
+    CDR -->|Sanitized| CleanStore[✅ Clean Storage]
+    CleanStore -->|Auth Download| AuthUser([Authorized User])
+```
+
+### Defense in Depth
+No single control is trusted completely.
+1.  **Isolation**: Files land in a directory that cannot be served by the web server.
+2.  **Detection**: Signature-based scanning catches known threats.
+3.  **Sanitization**: CDR neutralizes unknown threats (zero-days) in metadata.
+4.  **Access Control**: Files are only accessible via authenticated application logic, not direct links.
 
 ---
 
-## 🛠️ What’s under the hood?
+## 🛡 Implemented Security Controls
 
-- **Python + Django (4.2)** — web framework  
-- **django-cryptography** — for encrypting the file descriptions  
-- **Bootstrap** — basic dark-themed styling  
-- **SQLite** — because it just works for small projects  
+### 1. Malware Scanning
+- **ClamAV Integration**: Uses `pyclamd` to stream files to a local ClamAV daemon.
+- **Fail-Closed Logic**: If the scanner is offline, uploads are rejected (security > availability).
+- **Proactive**: Scanning occurs *before* the file is moved to permanent storage or a database record is finalized.
 
----
+### 2. Quarantine & State Machine
+- **State Enforcement**: The `UploadedFile` model enforces a strict state machine (`PENDING` → `CLEAN` or `REJECTED`).
+- **Physical Isolation**: Files are initially saved to `media/quarantine/`, a location successfully isolated from the `media/uploads/` directory.
+- **Atomic Promotion**: Only files that pass all checks are moved to the clean directory.
 
-## 🚀 How to run it
+### 3. Content Disarm & Reconstruction (CDR)
+We assume antivirus might miss zero-day exploits. CDR reconstructs files to destroy hidden payloads.
+- **Images (Pillow)**: Images are re-encoded (e.g., loaded and saved as new pixels), stripping potentially malicious EXIF metadata (GPS, Camera ID) and non-pixel payloads.
+- **PDFs (pypdf)**: PDF structures are parsed and rewritten to linearize content and remove appended malicious scripts.
+- **Disclaimer**: CDR may cause minor fidelity loss (e.g., metadata removal), which is an intentional security trade-off.
 
-1. Clone the repo:
+### 4. Protected Media Storage
+- **No Direct Access**: The web server’s static/media routing is configured to **ignore** the upload directory.
+- **Authenticated Gateway**: Files are served exclusively through a Django view (`download_file`) which verifies:
+    1.  User is logged in.
+    2.  User has permission (extensible).
+    3.  File status is explicitly `CLEAN`.
 
-```bash
-git clone https://github.com/your-username/secure-file-upload-portal.git
-cd secure-file-upload-portal
-```
-
-2. Create a virtual environment:
-
-```bash
-python -m venv venv
-source venv/Scripts/activate  # On Windows
-```
-
-3. Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-> Don’t have `requirements.txt` yet? You can generate it with:
-```bash
-pip freeze > requirements.txt
-```
-
-4. Run migrations:
-
-```bash
-python manage.py makemigrations
-python manage.py migrate
-```
-
-5. Start the server:
-
-```bash
-python manage.py runserver
-```
-
-Visit [http://localhost:8000](http://localhost:8000) in your browser.
+### 5. Security Logging
+- **Audit Trail**: A dedicated `SecurityEvent` model tracks critical security interactions.
+- **Forensics**: Logs identifying information (IP, User, Timestamp) for:
+    - `MALWARE_DETECTED`: Attempts to upload known viruses.
+    - `DOWNLOAD`: Who accessed which file and when.
 
 ---
 
-## 📂 Where do uploads go?
+## 🧪 Testing & Verification
 
-All uploaded files are stored in:
+The project includes a comprehensive test suite (`uploads/tests.py`) verifying security controls:
 
-```
-media/uploads/
-```
-
-Make sure these are set in `settings.py`:
-
-```python
-MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
-```
+- **Automated Tests**:
+    - Verifies valid files are processed and moved to clean storage.
+    - Verifies malware (EICAR signatures) is rejected and logged.
+    - Verifies scanner downtime triggers rejection (Fail-Closed).
+    - Verifies unauthenticated users cannot access downloads.
+- **Manual Verification**:
+    - Supports safe testing using the EICAR test file string.
 
 ---
 
-## 🎯 Why it matters
+## ⚙️ Deployment Requirements
 
-Handling uploads is a common feature — but it’s also one of the easiest places for bugs, leaks, or even exploits to sneak in. This project shows how to:
-- Encrypt data at rest
-- Validate file types
-- Keep things simple but solid
+### Prerequisites
+- Python 3.10+
+- **ClamAV Daemon**: Must be installed and running (`clamd`).
+- **Freshclam**: Virus definitions must be up to date.
+
+### Installation & Run
+
+1.  **Clone & Setup**:
+    ```bash
+    git clone https://github.com/Harshit-Maurya838/secure-file-upload-portal.git
+    cd secure-file-upload-portal
+    python -m venv venv
+    source venv/bin/activate  # or venv\Scripts\activate on Windows
+    pip install -r requirements.txt
+    ```
+
+2.  **Install System Dependencies (Linux/Debian)**:
+    ```bash
+    sudo apt-get install clamav clamav-daemon
+    sudo freshclam
+    sudo service clamav-daemon start
+    ```
+
+3.  **Database & Config**:
+    ```bash
+    python manage.py makemigrations
+    python manage.py migrate
+    ```
+
+4.  **Run Server**:
+    ```bash
+    python manage.py runserver
+    ```
+    *Note: In production, ensure your web server (Nginx/Apache) does NOT serve the `media/` directory.*
 
 ---
 
-## ✨ What could be next?
+## ⚠ Residual Risks & Future Work (For next Update)
 
-- Add file type whitelisting  
-- Use cloud storage like GCS or AWS S3  
-- Add safe/unsafe upload mode for demo purposes  
-- Build out a full login system with user-based access  
-
----
-
-Made with Django, encryption, and a healthy dose of paranoia 😅
+While robust, this Tier 1 implementation has known scope limitations:
+- **Signature Limitations**: ClamAV only detects known threats.
+- **Complex Formats**: CDR is currently limited to Images and PDFs. Office documents (`.docx`, `.xlsx`) require more complex parsing libraries.
+- **Advanced Analysis**: No sandboxing (behavioural analysis) is performed.
+- **DoS**: Large file uploads could still potentially exhaust resources (though Django limits are in place).
 
 ---
 
-## 📸 Screenshots
+## 🎯 Security Philosophy
 
-### 🔼 Upload Page
+> "Trust Input? **Never.**"
 
-![Upload Page](screenshots/upload-page.png)
+This project operates on the principle that every byte of user-submitted data is a potential exploit. By layering validation, isolation, and reconstruction, we reduce the attack surface significantly compared to standard file handling libraries.
 
 ---
 
-### 📄 File List Page
-
-![File List Page](screenshots/file-list.png)
