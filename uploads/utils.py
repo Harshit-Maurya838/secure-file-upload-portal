@@ -126,4 +126,21 @@ def sanitize_file(instance):
         logger.error(f"Error sanitizing file {file_path}: {str(e)}")
         raise ValidationError("File sanitization failed.")
 
+def log_security_event(event_type, request, file_name=None, details=None):
+    """
+    Logs a security event to the database.
+    """
+    from .models import SecurityEvent
+    
+    ip = request.META.get('REMOTE_ADDR')
+    user = request.user if request.user.is_authenticated else None
+    
+    SecurityEvent.objects.create(
+        event_type=event_type,
+        user=user,
+        ip_address=ip,
+        file_name=file_name or '',
+        details=details or ''
+    )
+
 

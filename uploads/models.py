@@ -33,4 +33,23 @@ class UploadedFile(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.file.name} - {self.uploaded_at.strftime('%Y-%m-%d %H:%M:%S')}"
+        return f"{self.file.name} - {self.uploaded_at.strftime('%Y-%m-%d %H:%M:%S')}" or "Uploaded File"
+
+class SecurityEvent(models.Model):
+    EVENT_TYPES = [
+        ('MALWARE_DETECTED', 'Malware Detected'),
+        ('INVALID_TYPE', 'Invalid File Type'),
+        ('SIZE_LIMIT', 'Size Limit Exceeded'),
+        ('DOWNLOAD', 'File Download'),
+        ('LOGIN_FAIL', 'Login Failure'),
+    ]
+    
+    timestamp = models.DateTimeField(auto_now_add=True)
+    event_type = models.CharField(max_length=20, choices=EVENT_TYPES)
+    user = models.ForeignKey('auth.User', on_delete=models.SET_NULL, null=True, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    file_name = models.CharField(max_length=255, blank=True)
+    details = models.TextField(blank=True)
+
+    def __str__(self):
+        return f"{self.timestamp} - {self.event_type} - {self.ip_address}"

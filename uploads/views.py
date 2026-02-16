@@ -6,7 +6,7 @@ from .models import UploadedFile
 
 from django_ratelimit.decorators import ratelimit
 
-from .utils import scan_file, move_to_clean, sanitize_file
+from .utils import scan_file, move_to_clean, sanitize_file, log_security_event
 from django.core.exceptions import ValidationError
 
 @ratelimit(key='ip', rate='10/m', method='POST', block=True)
@@ -27,6 +27,10 @@ def upload_file(request):
                 return redirect('file_list')
             except ValidationError as e:
                 # If infected or error, delete the file and the instance
+                virus_name = str(e)
+                if "Malware detected" in virus_name:
+                    log_security_event('MALWARE_DETECTED', request, instance.file.name, virus_name)
+                
                 instance.file.delete(save=False)
                 instance.delete()
                 form.add_error('file', e.message)
@@ -48,6 +52,7 @@ def download_file(request, file_id):
         
     try:
         response = FileResponse(instance.file.open('rb'), as_attachment=True)
+        log_security_event('DOWNLOAD', request, instance.file.name, "File downloaded successfully")
         return response
     except FileNotFoundError:
         raise Http404("File not found on server.")

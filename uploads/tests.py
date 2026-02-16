@@ -252,3 +252,43 @@ class ProtectedStorageTests(TestCase):
         response = self.client.get(url)
         
         self.assertEqual(response.status_code, 302) # Redirect to login
+
+class SecurityLoggingTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        from django.contrib.auth.models import User
+        self.user = User.objects.create_user(username='testuser', password='password')
+        self.url_upload = reverse('upload_file')
+
+    @patch('uploads.views.scan_file')
+    def test_log_malware_event(self, mock_scan):
+        self.client.login(username='testuser', password='password')
+        mock_scan.side_effect = ValidationError("Malware detected: EICAR")
+        
+        pdf_content = b"%PDF-1.4\n..."
+        file = SimpleUploadedFile("infected.pdf", pdf_content, content_type="application/pdf")
+        
+        self.client.post(self.url_upload, {'file': file, 'description': 'Infected'})
+        
+        from .models import SecurityEvent
+        event = SecurityEvent.objects.last()
+        self.assertIsNotNone(event)
+        self.assertEqual(event.event_type, 'MALWARE_DETECTED')
+        self.assertIn("EICAR", event.details)
+        self.assertEqual(event.user, self.user)
+
+    def test_log_download_event(self):
+        self.client.login(username='testuser', password='password')
+        
+        # Create clean file
+        f = SimpleUploadedFile("clean.txt", b"content")
+        instance = UploadedFile.objects.create(file=f, status='CLEAN')
+        
+        url = reverse('download_file', args=[instance.id])
+        self.client.get(url)
+        
+        from .models import SecurityEvent
+        event = SecurityEvent.objects.last()
+        self.assertIsNotNone(event)
+        self.assertEqual(event.event_type, 'DOWNLOAD')
+        self.assertEqual(event.user, self.user)
