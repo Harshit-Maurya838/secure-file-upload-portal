@@ -23,6 +23,7 @@ class UploadedFile(models.Model):
     hash = models.CharField(max_length=64, blank=True, editable=False)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='PENDING')
     uploaded_at = models.DateTimeField(auto_now_add=True)
+    original_filename = models.CharField(max_length=255, default="unknown_file")
 
     def save(self, *args, **kwargs):
         if not self.hash:

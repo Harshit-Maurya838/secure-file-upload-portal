@@ -16,7 +16,15 @@ def upload_file(request):
         form = UploadFileForm(request.POST, request.FILES)
         if form.is_valid():
             # Save initially to quarantine (status=PENDING)
-            instance = form.save()
+            # manually handling save to inject original_filename
+            instance = form.save(commit=False)
+            
+            # Sanitize and store original filename
+            from django.utils.text import get_valid_filename
+            original_name = request.FILES['file'].name
+            instance.original_filename = get_valid_filename(original_name)
+            
+            instance.save()
             try:
                 # Scan the file
                 scan_file(instance.file)
@@ -51,7 +59,7 @@ def download_file(request, file_id):
         raise Http404("File is not available for download.")
         
     try:
-        response = FileResponse(instance.file.open('rb'), as_attachment=True)
+        response = FileResponse(instance.file.open('rb'), as_attachment=True, filename=instance.original_filename)
         log_security_event('DOWNLOAD', request, instance.file.name, "File downloaded successfully")
         return response
     except FileNotFoundError:

@@ -51,12 +51,24 @@ We assume antivirus might miss zero-day exploits. CDR reconstructs files to dest
     1.  User is logged in.
     2.  User has permission (extensible).
     3.  File status is explicitly `CLEAN`.
+- **Identity Separation**: Files are stored on disk using **random UUIDs** to prevent collisions and guesswork, but are served to the user with their **Original Filename** for better UX.
 
 ### 5. Security Logging
 - **Audit Trail**: A dedicated `SecurityEvent` model tracks critical security interactions.
 - **Forensics**: Logs identifying information (IP, User, Timestamp) for:
     - `MALWARE_DETECTED`: Attempts to upload known viruses.
     - `DOWNLOAD`: Who accessed which file and when.
+
+---
+
+## 🎨 UI/UX
+
+The interface has been designed to reflect a "Secure Intake Gateway" rather than a standard web app.
+
+- **Theme**: High-contrast Dark Mode for enterprise environments.
+- **Visual Cues**: Clear status indicators (`PENDING` = Yellow, `CLEAN` = Green, `REJECTED` = Red).
+- **Usability**: Files are uploaded via a secure drag-and-drop zone and listed with their sanitized original names.
+
 
 ---
 

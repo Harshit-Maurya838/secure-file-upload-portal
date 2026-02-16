@@ -229,7 +229,8 @@ class ProtectedStorageTests(TestCase):
         
         self.assertEqual(response.status_code, 200)
         self.assertEqual(b"".join(response.streaming_content), b"content")
-        self.assertEqual(response['Content-Disposition'], f'attachment; filename="{instance.file.name.split("/")[-1]}"')
+        # Now expects original filename (default "unknown_file" since we didn't set it in create)
+        self.assertIn('filename="unknown_file"', response['Content-Disposition'])
 
     def test_download_pending_file_authenticated(self):
         self.client.login(username='testuser', password='password')
@@ -292,3 +293,45 @@ class SecurityLoggingTests(TestCase):
         self.assertIsNotNone(event)
         self.assertEqual(event.event_type, 'DOWNLOAD')
         self.assertEqual(event.user, self.user)
+
+class OriginalFilenameTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        from django.contrib.auth.models import User
+        self.user = User.objects.create_user(username='testuser', password='password')
+        self.client.login(username='testuser', password='password')
+        self.url_upload = reverse('upload_file')
+
+    @patch('uploads.views.scan_file')
+    @patch('uploads.views.move_to_clean')
+    @patch('uploads.views.sanitize_file')
+    def test_original_filename_stored(self, mock_sanitize, mock_move, mock_scan):
+        mock_scan.return_value = True
+        
+        file = SimpleUploadedFile("my_report.pdf", b"content", content_type="application/pdf")
+        
+        self.client.post(self.url_upload, {'file': file, 'description': 'Report'})
+        
+        instance = UploadedFile.objects.last()
+        self.assertEqual(instance.original_filename, "my_report.pdf")
+        # Ensure regex/uuid still used for storage
+        self.assertNotEqual(instance.file.name, "my_report.pdf")
+        self.assertTrue("uploads/" in instance.file.name or "quarantine/" in instance.file.name)
+
+    @patch('uploads.views.scan_file')
+    @patch('uploads.views.move_to_clean')
+    @patch('uploads.views.sanitize_file')
+    def test_original_filename_download(self, mock_sanitize, mock_move, mock_scan):
+        # Create file with original name
+        f = SimpleUploadedFile("clean.txt", b"content")
+        instance = UploadedFile.objects.create(
+            file=f, 
+            status='CLEAN',
+            original_filename="final_report_v2.txt"
+        )
+        
+        url = reverse('download_file', args=[instance.id])
+        response = self.client.get(url)
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('filename="final_report_v2.txt"', response['Content-Disposition'])
