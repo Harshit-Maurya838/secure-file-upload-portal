@@ -11,3 +11,5 @@ python-magic==0.4.27
 sqlparse==0.5.3
 tzdata==2025.2
 pyclamd==0.4.0
+pypdf==4.0.1
+

@@ -6,7 +6,7 @@ from .models import UploadedFile
 
 from django_ratelimit.decorators import ratelimit
 
-from .utils import scan_file
+from .utils import scan_file, move_to_clean, sanitize_file
 from django.core.exceptions import ValidationError
 
 @ratelimit(key='ip', rate='10/m', method='POST', block=True)
@@ -15,12 +15,20 @@ def upload_file(request):
     if request.method == 'POST':
         form = UploadFileForm(request.POST, request.FILES)
         if form.is_valid():
-            uploaded_file = request.FILES['file']
+            # Save initially to quarantine (status=PENDING)
+            instance = form.save()
             try:
-                scan_file(uploaded_file)
-                form.save()
+                # Scan the file
+                scan_file(instance.file)
+                # Sanitize (CDR)
+                sanitize_file(instance)
+                # If clean, move to clean storage
+                move_to_clean(instance)
                 return redirect('file_list')
             except ValidationError as e:
+                # If infected or error, delete the file and the instance
+                instance.file.delete(save=False)
+                instance.delete()
                 form.add_error('file', e.message)
     else:
         form = UploadFileForm()

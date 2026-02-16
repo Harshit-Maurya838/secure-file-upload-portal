@@ -9,13 +9,19 @@ import hashlib
 def get_file_path(instance, filename):
     ext = filename.split('.')[-1]
     filename = f"{uuid.uuid4()}.{ext}"
-    return os.path.join('uploads/', filename)
-
+    # Default to quarantine for new uploads
+    return os.path.join('quarantine/', filename)
 
 class UploadedFile(models.Model):
+    STATUS_CHOICES = [
+        ('PENDING', 'Pending Scan'),
+        ('CLEAN', 'Clean'),
+        ('REJECTED', 'Rejected'),
+    ]
     file = models.FileField(upload_to=get_file_path)
     description = encrypt(models.CharField(max_length=255, blank=True))
     hash = models.CharField(max_length=64, blank=True, editable=False)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='PENDING')
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):
