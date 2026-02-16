@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="security-dashboard">
+    <h2>Security Logs Dashboard</h2>
+
+    <div class="dashboard-controls">
+        <form method="get" class="filter-form">
+            <div class="form-group">
+                <label for="event_type">Event Type:</label>
+                <select name="event_type" id="event_type">
+                    <option value="">All Events</option>
+                    {% for type_code, type_name in event_types %}
+                        <option value="{{ type_code }}" {% if request.GET.event_type == type_code %}selected{% endif %}>{{ type_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="user">User:</label>
+                <input type="text" name="user" id="user" value="{{ request.GET.user }}" placeholder="Username">
+            </div>
+
+            <div class="form-group">
+                <label for="ip">IP Address:</label>
+                <input type="text" name="ip" id="ip" value="{{ request.GET.ip }}" placeholder="IP Address">
+            </div>
+
+            <div class="form-group">
+                <label for="date_min">From:</label>
+                <input type="date" name="date_min" id="date_min" value="{{ request.GET.date_min }}">
+            </div>
+
+            <div class="form-group">
+                <label for="date_max">To:</label>
+                <input type="date" name="date_max" id="date_max" value="{{ request.GET.date_max }}">
+            </div>
+
+            <button type="submit" class="btn btn-primary">Filter</button>
+            <a href="{% url 'security_logs' %}" class="btn btn-secondary">Clear</a>
+        </form>
+
+        <div class="export-controls">
+            <a href="{{ request.get_full_path }}&export=csv" class="btn btn-success">Export CSV</a>
+        </div>
+    </div>
+
+    <div class="table-container">
+        <table class="security-table">
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Event Type</th>
+                    <th>User</th>
+                    <th>IP Address</th>
+                    <th>File Name</th>
+                    <th>Details</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for event in page_obj %}
+                    <tr>
+                        <td>{{ event.timestamp|date:"Y-m-d H:i:s" }}</td>
+                        <td>
+                            <span class="badge badge-{{ event.event_type }}">
+                                {{ event.get_event_type_display }}
+                            </span>
+                        </td>
+                        <td>{{ event.user.username|default:"Anonymous" }}</td>
+                        <td>{{ event.ip_address }}</td>
+                        <td>{{ event.file_name }}</td>
+                        <td>{{ event.details }}</td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="6" class="no-data">No security events found.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="pagination">
+        <span class="step-links">
+            {% if page_obj.has_previous %}
+                <a href="?page=1{% if request.GET.event_type %}&event_type={{ request.GET.event_type }}{% endif %}{% if request.GET.user %}&user={{ request.GET.user }}{% endif %}{% if request.GET.ip %}&ip={{ request.GET.ip }}{% endif %}{% if request.GET.date_min %}&date_min={{ request.GET.date_min }}{% endif %}{% if request.GET.date_max %}&date_max={{ request.GET.date_max }}{% endif %}">&laquo; first</a>
+                <a href="?page={{ page_obj.previous_page_number }}{% if request.GET.event_type %}&event_type={{ request.GET.event_type }}{% endif %}{% if request.GET.user %}&user={{ request.GET.user }}{% endif %}{% if request.GET.ip %}&ip={{ request.GET.ip }}{% endif %}{% if request.GET.date_min %}&date_min={{ request.GET.date_min }}{% endif %}{% if request.GET.date_max %}&date_max={{ request.GET.date_max }}{% endif %}">previous</a>
+            {% endif %}
+
+            <span class="current">
+                Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}.
+            </span>
+
+            {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}{% if request.GET.event_type %}&event_type={{ request.GET.event_type }}{% endif %}{% if request.GET.user %}&user={{ request.GET.user }}{% endif %}{% if request.GET.ip %}&ip={{ request.GET.ip }}{% endif %}{% if request.GET.date_min %}&date_min={{ request.GET.date_min }}{% endif %}{% if request.GET.date_max %}&date_max={{ request.GET.date_max }}{% endif %}">next</a>
+                <a href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.event_type %}&event_type={{ request.GET.event_type }}{% endif %}{% if request.GET.user %}&user={{ request.GET.user }}{% endif %}{% if request.GET.ip %}&ip={{ request.GET.ip }}{% endif %}{% if request.GET.date_min %}&date_min={{ request.GET.date_min }}{% endif %}{% if request.GET.date_max %}&date_max={{ request.GET.date_max }}{% endif %}">last &raquo;</a>
+            {% endif %}
+        </span>
+    </div>
+</div>
+{% endblock %}
