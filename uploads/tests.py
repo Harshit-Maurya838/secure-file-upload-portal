@@ -209,3 +209,46 @@ class CDRTests(TestCase):
         # Cleanup
         if os.path.exists(path):
             os.remove(path)
+
+class ProtectedStorageTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        from django.contrib.auth.models import User
+        self.user = User.objects.create_user(username='testuser', password='password')
+        self.url_upload = reverse('upload_file')
+
+    def test_download_clean_file_authenticated(self):
+        self.client.login(username='testuser', password='password')
+        
+        # Create a clean file
+        f = SimpleUploadedFile("clean.txt", b"content")
+        instance = UploadedFile.objects.create(file=f, status='CLEAN')
+        
+        url = reverse('download_file', args=[instance.id])
+        response = self.client.get(url)
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(b"".join(response.streaming_content), b"content")
+        self.assertEqual(response['Content-Disposition'], f'attachment; filename="{instance.file.name.split("/")[-1]}"')
+
+    def test_download_pending_file_authenticated(self):
+        self.client.login(username='testuser', password='password')
+        
+        # Create a pending file
+        f = SimpleUploadedFile("pending.txt", b"content")
+        instance = UploadedFile.objects.create(file=f, status='PENDING')
+        
+        url = reverse('download_file', args=[instance.id])
+        response = self.client.get(url)
+        
+        self.assertEqual(response.status_code, 404) # Should not be found/available
+
+    def test_download_file_unauthenticated(self):
+        # Create a clean file
+        f = SimpleUploadedFile("clean.txt", b"content")
+        instance = UploadedFile.objects.create(file=f, status='CLEAN')
+        
+        url = reverse('download_file', args=[instance.id])
+        response = self.client.get(url)
+        
+        self.assertEqual(response.status_code, 302) # Redirect to login
