@@ -36,6 +36,22 @@
 </header>
 
 <main class="main-content">
+    {% if messages %}
+        <div class="flash-messages-container">
+            {% for message in messages %}
+                <div class="flash-message {{ message.tags }}">
+                    <span class="message-icon">
+                        {% if message.tags == 'success' %}✓
+                        {% elif message.tags == 'error' %}⚠️
+                        {% elif message.tags == 'warning' %}❗
+                        {% else %}ℹ️{% endif %}
+                    </span>
+                    <span class="message-text">{{ message }}</span>
+                    <button class="message-close" onclick="this.parentElement.remove();">&times;</button>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
     {% block content %}
     {% endblock %}
 </main>

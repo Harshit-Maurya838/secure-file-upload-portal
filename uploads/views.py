@@ -2,8 +2,7 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
 from .forms import UploadFileForm
 from .models import UploadedFile
-
-
+from django.contrib import messages
 from django_ratelimit.decorators import ratelimit
 
 from .utils import scan_file, move_to_clean, sanitize_file, log_security_event
@@ -39,6 +38,7 @@ def upload_file(request):
                 sanitize_file(instance)
                 # If clean, move to clean storage
                 move_to_clean(instance)
+                messages.success(request, f"Upload Successful: File '{instance.original_filename}' has been safely stored.")
                 return redirect('file_list')
             except ValidationError as e:
                 # If infected or error, delete the file and the instance
@@ -48,6 +48,7 @@ def upload_file(request):
                 
                 instance.file.delete(save=False)
                 instance.delete()
+                messages.error(request, f"Malware Detected / Upload Rejected: {e.message}")
                 form.add_error('file', e.message)
     else:
         form = UploadFileForm()
@@ -66,10 +67,12 @@ def download_file(request, file_id):
         raise Http404("File is not available for download.")
         
     try:
+        messages.success(request, f"Download initiated for {instance.original_filename}.")
         response = FileResponse(instance.file.open('rb'), as_attachment=True, filename=instance.original_filename)
         log_security_event('DOWNLOAD', request, instance.file.name, "File downloaded successfully")
         return response
     except FileNotFoundError:
+        messages.error(request, "File not found on server.")
         raise Http404("File not found on server.")
 
 @login_required
